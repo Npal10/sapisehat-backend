@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Mail;
+use App\Mail\OtpMail;
 
 class AuthController extends Controller
 {
@@ -150,11 +151,12 @@ class AuthController extends Controller
             'created_at' => now(),
         ]);
 
-        // Simulasikan pengiriman email dengan menulisnya ke console (muncul di terminal php artisan serve)
-        error_log("=== OTP RESET PASSWORD ===");
-        error_log("Email: {$email}");
-        error_log("OTP: {$otp}");
-        error_log("==========================");
+        // Mengirimkan email OTP sesungguhnya
+        try {
+            Mail::to($email)->send(new OtpMail($otp));
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Gagal mengirim email OTP. Pastikan konfigurasi SMTP benar.'], 500);
+        }
 
         return response()->json(['message' => 'OTP telah dikirim ke email Anda.']);
     }

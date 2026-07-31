@@ -154,8 +154,8 @@ class AuthController extends Controller
         // Mengirimkan email OTP sesungguhnya
         try {
             Mail::to($email)->send(new OtpMail($otp));
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Gagal mengirim email OTP. Pastikan konfigurasi SMTP benar.'], 500);
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Gagal mengirim email: ' . $e->getMessage()], 500);
         }
 
         return response()->json(['message' => 'OTP telah dikirim ke email Anda.']);

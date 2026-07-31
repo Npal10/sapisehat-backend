@@ -37,6 +37,11 @@ return [
 
     'mailers' => [
 
+        'brevo' => [
+            'transport' => 'symfony',
+            'dsn' => env('BREVO_DSN', 'brevo+api://'.env('BREVO_KEY').'@default'),
+        ],
+
         'smtp' => [
             'transport' => 'smtp',
             'scheme' => env('MAIL_SCHEME'),

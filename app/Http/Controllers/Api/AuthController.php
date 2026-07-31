@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Http;
 use App\Mail\OtpMail;
 
 class AuthController extends Controller
@@ -151,9 +152,33 @@ class AuthController extends Controller
             'created_at' => now(),
         ]);
 
-        // Mengirimkan email OTP sesungguhnya
+        // Mengirimkan email OTP menggunakan API langsung (Bypass Symfony Mailer)
         try {
-            Mail::to($email)->send(new OtpMail($otp));
+            $brevoKey = env('BREVO_KEY');
+            if (!$brevoKey) {
+                return response()->json(['message' => 'BREVO_KEY belum diatur di Railway.'], 500);
+            }
+
+            $response = Http::timeout(5)->withHeaders([
+                'api-key' => $brevoKey,
+                'Content-Type' => 'application/json',
+                'accept' => 'application/json',
+            ])->post('https://api.brevo.com/v3/smtp/email', [
+                'sender' => [
+                    'name' => env('MAIL_FROM_NAME', 'SapiSehat Admin'),
+                    'email' => env('MAIL_FROM_ADDRESS', 'admin@sapisehat.com')
+                ],
+                'to' => [
+                    ['email' => $email]
+                ],
+                'subject' => 'Kode OTP Reset Password SapiSehat',
+                'htmlContent' => '<html><body style="font-family: Arial, sans-serif; text-align: center; padding: 20px;"><h2>SapiSehat</h2><p>Kode OTP Anda adalah:</p><h1 style="color: #1565C0; letter-spacing: 5px;">' . $otp . '</h1><p>Berlaku selama 15 menit.</p></body></html>'
+            ]);
+
+            if (!$response->successful()) {
+                return response()->json(['message' => 'Gagal dari server Brevo: ' . $response->body()], 500);
+            }
+
         } catch (\Throwable $e) {
             return response()->json(['message' => 'Gagal mengirim email: ' . $e->getMessage()], 500);
         }

@@ -106,31 +106,9 @@ class AuthController extends Controller
             $validated = $request->validate([
                 'name'  => 'required|string|max:255',
                 'location' => 'nullable|string|max:255',
-                'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB max
             ], [
                 'name.required' => 'Harap isi Nama',
             ]);
-
-            // Simpan foto sebagai Base64 langsung ke kolom database
-            // Ini lebih andal daripada penyimpanan file karena data tidak akan hilang saat server Railway melakukan re-deploy
-            if ($request->hasFile('photo')) {
-                $photoContent = file_get_contents($request->file('photo')->getRealPath());
-                $mimeType = $request->file('photo')->getMimeType();
-                $base64 = 'data:' . $mimeType . ';base64,' . base64_encode($photoContent);
-                
-                // Batasi ukuran Base64 maksimum 2MB agar tidak melebihi batas MySQL max_allowed_packet
-                if (strlen($base64) > 2 * 1024 * 1024) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Ukuran foto terlalu besar. Harap pilih foto yang lebih kecil (maks. 1MB).',
-                    ], 422);
-                }
-                
-                $validated['photo_base64'] = $base64;
-            }
-
-            // Hapus 'photo' dari array agar tidak mencoba disimpan ke kolom yang tidak ada
-            unset($validated['photo']);
 
             $user->update($validated);
 
@@ -147,7 +125,7 @@ class AuthController extends Controller
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan pada server: ' . $e->getMessage() . ' di file ' . $e->getFile() . ' baris ' . $e->getLine(),
+                'message' => 'Terjadi kesalahan pada server: ' . $e->getMessage(),
             ], 500);
         }
     }

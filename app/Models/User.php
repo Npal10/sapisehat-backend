@@ -25,6 +25,7 @@ class User extends Authenticatable
         'location',
         'password',
         'photo_url',
+        'photo_base64',
         'fcm_token',
     ];
 

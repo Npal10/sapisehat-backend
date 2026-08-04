@@ -104,18 +104,26 @@ class AuthController extends Controller
             $user = $request->user();
             
             $validated = $request->validate([
-                'name'  => 'required|string|max:255',
-                'location' => 'nullable|string|max:255',
+                'name'         => 'required|string|max:255',
+                'location'     => 'nullable|string|max:255',
+                'photo_base64' => 'nullable|string',
             ], [
                 'name.required' => 'Harap isi Nama',
             ]);
 
-            $user->update($validated);
+            // Jika ada foto baru dikirim, simpan ke kolom photo_base64
+            if (!empty($validated['photo_base64'])) {
+                $user->photo_base64 = $validated['photo_base64'];
+            }
+
+            $user->name     = $validated['name'];
+            $user->location = $validated['location'] ?? $user->location;
+            $user->save();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Profil berhasil diperbarui',
-                'data' => $user,
+                'data'    => $user,
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([

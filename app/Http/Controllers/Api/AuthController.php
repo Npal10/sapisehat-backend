@@ -103,21 +103,24 @@ class AuthController extends Controller
         $user = $request->user();
         
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name'  => 'required|string|max:255',
             'location' => 'nullable|string|max:255',
             'photo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB max
         ], [
             'name.required' => 'Harap isi Nama',
         ]);
 
+        // Simpan foto sebagai Base64 langsung ke kolom database
+        // Ini lebih andal daripada penyimpanan file karena data tidak akan hilang saat server Railway melakukan re-deploy
         if ($request->hasFile('photo')) {
-            if ($user->photo_url) {
-                $oldPath = str_replace('/storage/', '', $user->photo_url);
-                \Illuminate\Support\Facades\Storage::disk('public')->delete($oldPath);
-            }
-            $path = $request->file('photo')->store('profiles', 'public');
-            $validated['photo_url'] = \Illuminate\Support\Facades\Storage::url($path);
+            $photoContent = file_get_contents($request->file('photo')->getRealPath());
+            $mimeType = $request->file('photo')->getMimeType();
+            $base64 = 'data:' . $mimeType . ';base64,' . base64_encode($photoContent);
+            $validated['photo_base64'] = $base64;
         }
+
+        // Hapus 'photo' dari array agar tidak mencoba disimpan ke kolom yang tidak ada
+        unset($validated['photo']);
 
         $user->update($validated);
 

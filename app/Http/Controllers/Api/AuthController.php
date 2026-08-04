@@ -116,6 +116,15 @@ class AuthController extends Controller
             $photoContent = file_get_contents($request->file('photo')->getRealPath());
             $mimeType = $request->file('photo')->getMimeType();
             $base64 = 'data:' . $mimeType . ';base64,' . base64_encode($photoContent);
+            
+            // Batasi ukuran Base64 maksimum 2MB agar tidak melebihi batas MySQL max_allowed_packet
+            if (strlen($base64) > 2 * 1024 * 1024) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Ukuran foto terlalu besar. Harap pilih foto yang lebih kecil (maks. 1MB).',
+                ], 422);
+            }
+            
             $validated['photo_base64'] = $base64;
         }
 

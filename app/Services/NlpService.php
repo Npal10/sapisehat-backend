@@ -16,13 +16,9 @@ class NlpService
         $this->apiKey = config('services.gemini.api_key');
     }
 
-    /**
-     * Menganalisis gejala dan mengembalikan array data hasil prediksi.
-     */
+
     public function analyzeDisease(array $questionnaire, string $description): array
     {
-        // 1. Memilah kuisioner menjadi gejala yang dialami ("Ya") dan tidak dialami ("Tidak")
-        // Ini membantu AI memusatkan analisis pada gejala yang bernilai "Ya" secara eksplisit
         $gejalaYa = [];
         $gejalaTidak = [];
         foreach ($questionnaire as $question => $answer) {
@@ -38,10 +34,9 @@ class NlpService
             "GEJALA YANG TIDAK DIALAMI (JAWABAN TIDAK):\n" . 
             (empty($gejalaTidak) ? "(Tidak ada)\n" : implode("\n", $gejalaTidak) . "\n");
 
-        // 2. Merakit Prompt (Prompt Engineering)
-        // Meminta AI menganalisis penyakit mana yang dominan (PMK atau LSD) beserta tingkat risikonya dalam persentase
         $prompt = "Anda adalah sistem ahli dokter hewan virtual untuk deteksi dini penyakit sapi. " .
-            "Tugas Anda adalah menganalisis input gejala kuisioner dan deskripsi tambahan berikut untuk menentukan penyakit mana yang lebih dominan antara Foot and Mouth Disease (FMD/PMK) dan Lumpy Skin Disease (LSD), atau menyatakan sapi Sehat jika tidak ada gejala spesifik.\n\n" .
+            "Tugas Anda adalah menganalisis input gejala kuisioner dan deskripsi tambahan berikut untuk menentukan penyakit mana yang lebih dominan antara Foot and Mouth Disease (FMD/PMK) dan Lumpy Skin Disease (LSD), 
+            atau menyatakan sapi Sehat jika tidak ada gejala spesifik.\n\n" .
             "PEDOMAN SKORING PENYAKIT:\n" .
             "1. PMK (FMD):\n" .
             "   - Gejala Spesifik: Ngiler berlebihan, luka/lepuh di mulut/gusi/lidah, luka di kaki/kuku, pincang, demam tinggi, sapi lain satu kandang sakit.\n" .
@@ -65,7 +60,6 @@ class NlpService
             "}";
 
         try {
-            // 3. Mengirim Request ke Gemini API
             $response = Http::timeout(10)->post($this->apiUrl . '?key=' .$this->apiKey, [
                 'contents' => [
                     [
@@ -75,7 +69,7 @@ class NlpService
                     ]
                 ],
                 'generationConfig' => [
-                    'temperature' => 0.1, // Rendah untuk konsistensi tinggi
+                    'temperature' => 0.1,
                 ]
             ]);
 
@@ -114,9 +108,7 @@ class NlpService
         }
     }
 
-    /**
-     * Algoritma pakar manual tanpa AI (Mode Offline)
-     */
+
     private function fallbackAnalysis(array $questionnaire, string $description): array
     {
         $pmkScore = 0;
@@ -124,7 +116,6 @@ class NlpService
         $pmkSymptoms = [];
         $lsdSymptoms = [];
 
-        // Evaluasi kuisioner
         foreach ($questionnaire as $question => $answer) {
             if ($answer) {
                 $qLower = strtolower($question);
@@ -143,7 +134,6 @@ class NlpService
             }
         }
         
-        // Evaluasi deskripsi teks bebas
         $descLower = strtolower($description);
         if (preg_match_all('/(ngiler|liur|mulut|lidah|luka|lepuh|kaki|kuku|pincang)/', $descLower, $matches)) {
             $pmkScore += count($matches[0]);
@@ -157,7 +147,6 @@ class NlpService
         $pmkSymptoms = array_unique($pmkSymptoms);
         $lsdSymptoms = array_unique($lsdSymptoms);
 
-        // Menentukan diagnosis dominan
         $dominant = 'Sehat';
         $riskLevel = 'Rendah';
         $confidence = 0.0;
@@ -172,7 +161,7 @@ class NlpService
             $recommendation = "Tetap jaga kebersihan kandang, berikan pakan bergizi, dan pantau kesehatan sapi secara berkala.";
         } elseif ($pmkScore >= $lsdScore) {
             $dominant = 'PMK';
-            $confidence = min(60.0 + ($pmkScore * 4), 95.0); // Skor kalkulasi persentase probabilistik sederhana
+            $confidence = min(60.0 + ($pmkScore * 4), 95.0); 
             if ($pmkScore >= 8) {
                 $riskLevel = 'Tinggi';
             } elseif ($pmkScore >= 4) {

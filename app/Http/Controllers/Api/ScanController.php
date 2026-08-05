@@ -22,7 +22,6 @@ class ScanController extends Controller
 
     public function analyze(Request $request)
     {
-        // 1. Validasi Input dari Flutter
         $request->validate([
             'cow_id' => 'required|exists:cows,id',
             'questionnaire' => 'required|array',
@@ -30,13 +29,11 @@ class ScanController extends Controller
         ]);
 
         try {
-            // 2. Kirim ke NLP Service untuk Dianalisis
             $analysisResult = $this->nlpService->analyzeDisease(
                 $request->questionnaire,
                 $request->description
             );
 
-            // 3. Simpan ke Database (Tabel Scans)
             $scan = Scan::create([
                 'cow_id' => $request->cow_id,
                 'questionnaire_data' => json_encode($request->questionnaire),
@@ -48,7 +45,6 @@ class ScanController extends Controller
                 'recommendation' => $analysisResult['recommendation'],
             ]);
 
-            // 4. Kembalikan Response Sukses ke Flutter
             return response()->json([
                 'success' => true,
                 'message' => 'Analisis berhasil dilakukan.',
@@ -56,7 +52,7 @@ class ScanController extends Controller
             ], 201);
 
         } catch (Exception $e) {
-            // Jika ada error (misal API timeout), kembalikan error ke Flutter
+
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal melakukan analisis: ' . $e->getMessage(),

@@ -206,4 +206,4 @@ class NlpService
             'recommendation' => $recommendation
         ];
     }
-}
+}

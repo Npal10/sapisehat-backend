@@ -37,6 +37,10 @@ class NlpService
             }
         }
 
+        // ─── TAHAP 2: ANALISIS HIBRIDA - KOMPUTASI SKOR KLINIS LOKAL (LOCAL PRIOR SCORING) ───
+        // Backend Laravel menghitung kalkulasi skor klinis awal secara mandiri sebelum AI dipanggil
+        $localScores = $this->calculatePriorScores($questionnaire, $extractedSymptoms);
+
         $questionnaireText = "GEJALA YANG DIALAMI (JAWABAN IYA):\n" . 
             (empty($gejalaYa) ? "(Tidak ada gejala yang dipilih)\n" : implode("\n", $gejalaYa) . "\n") . "\n" .
             "GEJALA YANG TIDAK DIALAMI (JAWABAN TIDAK):\n" . 
@@ -45,9 +49,14 @@ class NlpService
         $extractedText = "HASIL EKSTRAKSI KATA KUNCI GEJALA DARI DESKRIPSI:\n" .
             (empty($extractedSymptoms) ? "(Tidak terdeteksi kata kunci gejala khusus)\n" : implode(", ", $extractedSymptoms) . "\n");
 
-        // ─── TAHAP 2: PROMPT ENGINEERING BERBASIS TEKS TER-PREPROSES ───
+        $localComputationText = "REKAPITULASI KOMPUTASI LOKAL BACKEND SERVER:\n" .
+            "- Indikasi Skor PMK Lokal: " . $localScores['pmk'] . " poin\n" .
+            "- Indikasi Skor LSD Lokal: " . $localScores['lsd'] . " poin\n" .
+            "- Prediksi Awal Lokal: " . $localScores['dominant_suggestion'] . " (Estimasi " . $localScores['confidence_suggestion'] . "%)\n";
+
+        // ─── TAHAP 3: PROMPT ENGINEERING BERBASIS TEKS TER-PREPROSES & DATA HIBRIDA ───
         $prompt = "Anda adalah sistem ahli dokter hewan virtual untuk deteksi dini penyakit sapi. " .
-            "Tugas Anda adalah menganalisis input gejala kuisioner dan deskripsi tambahan ter-preproses berikut untuk menentukan penyakit mana yang lebih dominan antara Foot and Mouth Disease (FMD/PMK) dan Lumpy Skin Disease (LSD), " .
+            "Tugas Anda adalah menganalisis input gejala kuisioner, deskripsi tambahan ter-preproses, dan data rekapitulasi komputasi lokal berikut untuk menentukan penyakit mana yang lebih dominan antara Foot and Mouth Disease (FMD/PMK) dan Lumpy Skin Disease (LSD), " .
             "atau menyatakan sapi Sehat jika tidak ada gejala spesifik.\n\n" .
             "PEDOMAN SKORING PENYAKIT:\n" .
             "1. PMK (FMD):\n" .
@@ -57,6 +66,8 @@ class NlpService
             "Data Masukan Kuisioner:\n" . $questionnaireText . "\n" .
             "Teks Deskripsi Bebas Peternak (Sudah Dicleaning & Normalisasi):\n\"" . $cleanDescription . "\"\n\n" .
             $extractedText . "\n" .
+            $localComputationText . "\n" .
+
 
             "TUGAS ANALISIS ANDA:\n" .
             "- Bandingkan jumlah dan bobot gejala spesifik PMK dan LSD yang bernilai 'IYA' baik dari kuisioner maupun dari teks deskripsi tambahan.\n" .
@@ -289,5 +300,65 @@ class NlpService
 
         return $foundKeywords;
     }
+
+    /**
+     * ─── TAHAP KOMPUTASI SKOR KLINIS LOKAL (LOCAL PRIOR CLINICAL SCORING) ───
+     * Menghitung bobot indikasi awal PMK vs LSD secara komputasional di backend Laravel
+     */
+    private function calculatePriorScores(array $questionnaire, array $extractedSymptoms): array
+    {
+        $pmkScore = 0.0;
+        $lsdScore = 0.0;
+
+        // 1. Evaluasi Bobot Kuisioner
+        foreach ($questionnaire as $question => $answer) {
+            if ($answer) {
+                $qLower = strtolower($question);
+                if (preg_match('/(ngiler|liur|mulut|lidah|sariawan|lepuh|pincang|kuku)/i', $qLower)) {
+                    $pmkScore += 2.0;
+                } else if (preg_match('/(benjolan|nodul|bintol|bentol|teracak|lato-lato)/i', $qLower)) {
+                    $lsdScore += 2.0;
+                } else if (preg_match('/(demam|panas|suhu|lemas|lesu|makan)/i', $qLower)) {
+                    $pmkScore += 1.0;
+                    $lsdScore += 1.0;
+                }
+            }
+        }
+
+        // 2. Evaluasi Bobot Ekstraksi Kata Kunci Teks Deskripsi
+        foreach ($extractedSymptoms as $sym) {
+            if (str_contains($sym, 'PMK')) {
+                $pmkScore += 1.5;
+            } else if (str_contains($sym, 'LSD')) {
+                $lsdScore += 1.5;
+            } else {
+                $pmkScore += 0.5;
+                $lsdScore += 0.5;
+            }
+        }
+
+        // 3. Penentuan Estimasi Awal
+        $dominant = 'Sehat';
+        $confidence = 100.0;
+
+        if ($pmkScore == 0 && $lsdScore == 0) {
+            $dominant = 'Sehat';
+            $confidence = 100.0;
+        } elseif ($pmkScore >= $lsdScore) {
+            $dominant = 'PMK';
+            $confidence = min(60.0 + ($pmkScore * 4.0), 95.0);
+        } else {
+            $dominant = 'LSD';
+            $confidence = min(60.0 + ($lsdScore * 4.0), 95.0);
+        }
+
+        return [
+            'pmk' => $pmkScore,
+            'lsd' => $lsdScore,
+            'dominant_suggestion' => $dominant,
+            'confidence_suggestion' => round($confidence, 1)
+        ];
+    }
 }
+
 

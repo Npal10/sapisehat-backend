@@ -39,9 +39,9 @@ class NlpService
             atau menyatakan sapi Sehat jika tidak ada gejala spesifik.\n\n" .
             "PEDOMAN SKORING PENYAKIT:\n" .
             "1. PMK (FMD):\n" .
-            "   - Gejala Spesifik: Ngiler berlebihan, luka/lepuh di mulut/gusi/lidah, luka di kaki/kuku, pincang, demam tinggi, sapi lain satu kandang sakit.\n" .
+            "   - Gejala Spesifik: giler berlebihan/ngreweh, luka/lepuh/sariawan di mulut/gusi/lidah, luka di kaki/kuku, pincang, demam , sapi lain satu kandang sakit.\n" .
             "2. LSD (Lato-lato):\n" .
-            "   - Gejala Spesifik: Benjolan/nodul keras bulat di kulit leher/tubuh, bengkak di sekitar benjolan, kaki bengkak, demam.\n\n" .
+            "   - Gejala Spesifik: Benjolan/nodul keras bulat di kulit leher/tubuh, bengkak/memerah di bagian atas teracak, demam ,sapi lain satu kandang sakit.\n\n" .
             "Data Masukan Kuisioner:\n" . $questionnaireText . "\n" .
             "Data Deskripsi Tambahan dari Peternak:\n\"" . $description . "\"\n\n" .
             "TUGAS ANALISIS ANDA:\n" .
@@ -119,7 +119,7 @@ class NlpService
         foreach ($questionnaire as $question => $answer) {
             if ($answer) {
                 $qLower = strtolower($question);
-                if (preg_match('/(ngiler|liur|mulut|lidah|luka|lepuh|kaki|kuku|pincang)/', $qLower, $matches)) {
+                if (preg_match('/(ngiler|ngreweh|sariawan|liur|mulut|lidah|luka|lepuh|kaki|tracak|kuku|pincang)/', $qLower, $matches)) {
                     $pmkScore += 2;
                     $pmkSymptoms[] = $matches[1];
                 } else if (preg_match('/(demam|suhu)/', $qLower, $matches)) {
@@ -135,7 +135,7 @@ class NlpService
         }
         
         $descLower = strtolower($description);
-        if (preg_match_all('/(ngiler|liur|mulut|lidah|luka|lepuh|kaki|kuku|pincang)/', $descLower, $matches)) {
+        if (preg_match_all('/(ngiler|ngreweh|sariawan|liur|mulut|lidah|luka|lepuh|kaki|tracak|kuku|pincang)/', $descLower, $matches)) {
             $pmkScore += count($matches[0]);
             $pmkSymptoms = array_merge($pmkSymptoms, $matches[0]);
         }

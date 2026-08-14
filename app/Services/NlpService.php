@@ -286,7 +286,7 @@ class NlpService
             'PMK: Sariawan / Lepuh Mulut'=> '/(sariawan|lepuh|luka mulut|lidah|gusi)/i',
             'PMK: Pincang / Luka Kuku'  => '/(pincang|kuku|kaki luka|sulit berdiri)/i',
             'LSD: Benjolan / Nodul Kulit' => '/(benjolan|nodul|lato-lato|bintol|bentol)/i',
-            'LSD: Kaki Bengkak Teracak'  => '/(bengkak|teracak|meradang)/i',
+            'LSD: Kaki Bengkak Teracak'  => '/(bengkak|teracak|meradang|memerah)/i',
             'LSD: Mata / Hidung Berlendir'=> '/(mata berair|hidung|lendir)/i',
             'GEJALA: Demam / Panas'      => '/(demam|panas|suhu)/i',
             'GEJALA: Nafsu Makan Turun'  => '/(tidak makan|kurang makan|lahap|lemas|lesu)/i',

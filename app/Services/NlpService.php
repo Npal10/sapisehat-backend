@@ -19,6 +19,14 @@ class NlpService
 
     public function analyzeDisease(array $questionnaire, string $description): array
     {
+        // ─── TAHAP 1: PIPELINE PRA-PEMROSESAN NLP (NLP PREPROCESSING PIPELINE) ───
+        // 1.1 Pre-processing Teks Deskripsi Bebas Peternak (Cleaning, Lowercase, Normalisasi Kata Slang/Singkatan)
+        $cleanDescription = $this->preprocessText($description);
+
+        // 1.2 Ekstraksi Kata Kunci Gejala Klinis dari Teks Bebas
+        $extractedSymptoms = $this->extractSymptomKeywords($cleanDescription);
+
+        // 1.3 Pengelompokan Data Kuisioner Terstruktur
         $gejalaYa = [];
         $gejalaTidak = [];
         foreach ($questionnaire as $question => $answer) {
@@ -34,16 +42,22 @@ class NlpService
             "GEJALA YANG TIDAK DIALAMI (JAWABAN TIDAK):\n" . 
             (empty($gejalaTidak) ? "(Tidak ada)\n" : implode("\n", $gejalaTidak) . "\n");
 
+        $extractedText = "HASIL EKSTRAKSI KATA KUNCI GEJALA DARI DESKRIPSI:\n" .
+            (empty($extractedSymptoms) ? "(Tidak terdeteksi kata kunci gejala khusus)\n" : implode(", ", $extractedSymptoms) . "\n");
+
+        // ─── TAHAP 2: PROMPT ENGINEERING BERBASIS TEKS TER-PREPROSES ───
         $prompt = "Anda adalah sistem ahli dokter hewan virtual untuk deteksi dini penyakit sapi. " .
-            "Tugas Anda adalah menganalisis input gejala kuisioner dan deskripsi tambahan berikut untuk menentukan penyakit mana yang lebih dominan antara Foot and Mouth Disease (FMD/PMK) dan Lumpy Skin Disease (LSD), 
-            atau menyatakan sapi Sehat jika tidak ada gejala spesifik.\n\n" .
+            "Tugas Anda adalah menganalisis input gejala kuisioner dan deskripsi tambahan ter-preproses berikut untuk menentukan penyakit mana yang lebih dominan antara Foot and Mouth Disease (FMD/PMK) dan Lumpy Skin Disease (LSD), " .
+            "atau menyatakan sapi Sehat jika tidak ada gejala spesifik.\n\n" .
             "PEDOMAN SKORING PENYAKIT:\n" .
             "1. PMK (FMD):\n" .
-            "   - Gejala Spesifik: giler berlebihan/ngreweh, luka/lepuh/sariawan di mulut/gusi/lidah, luka di kaki/kuku, pincang, demam , sapi lain satu kandang sakit.\n" .
+            "   - Gejala Spesifik: Ngiler berlebihan/ngreweh, luka/lepuh/sariawan di mulut/gusi/lidah, luka di kaki/kuku, pincang, demam, sapi lain satu kandang sakit.\n" .
             "2. LSD (Lato-lato):\n" .
-            "   - Gejala Spesifik: Benjolan/nodul keras bulat di kulit leher/tubuh, bengkak/memerah di bagian atas teracak, demam ,sapi lain satu kandang sakit.\n\n" .
+            "   - Gejala Spesifik: Benjolan/nodul keras bulat di kulit leher/tubuh, bengkak/memerah di bagian atas teracak, demam, sapi lain satu kandang sakit.\n\n" .
             "Data Masukan Kuisioner:\n" . $questionnaireText . "\n" .
-            "Data Deskripsi Tambahan dari Peternak:\n\"" . $description . "\"\n\n" .
+            "Teks Deskripsi Bebas Peternak (Sudah Dicleaning & Normalisasi):\n\"" . $cleanDescription . "\"\n\n" .
+            $extractedText . "\n" .
+
             "TUGAS ANALISIS ANDA:\n" .
             "- Bandingkan jumlah dan bobot gejala spesifik PMK dan LSD yang bernilai 'IYA' baik dari kuisioner maupun dari teks deskripsi tambahan.\n" .
             "- Tentukan salah satu penyakit yang paling dominan (jika tidak ada gejala klinis yang mengarah ke PMK atau LSD, tentukan sebagai 'Sehat').\n" .
@@ -195,4 +209,85 @@ class NlpService
             'recommendation' => $recommendation
         ];
     }
+
+    /**
+     * ─── TAHAP PRA-PEMROSESAN TEKS (NLP PREPROCESSING PIPELINE) ───
+     * Meliputi: Case Folding, Cleaning Tanda Baca/Simbol, dan Normalisasi Slang/Singkatan Peternak
+     */
+    private function preprocessText(string $text): string
+    {
+        if (trim($text) === '') return '';
+
+        // 1. Case Folding: Mengubah teks menjadi huruf kecil
+        $text = strtolower($text);
+
+        // 2. Kamus Normalisasi Kata Informal / Singkatan Peternak
+        $slangMap = [
+            '/\btdk\b/i'     => 'tidak',
+            '/\bgk\b/i'      => 'tidak',
+            '/\bga\b/i'      => 'tidak',
+            '/\bgatau\b/i'   => 'tidak tahu',
+            '/\bkrn\b/i'     => 'karena',
+            '/\bklo\b/i'     => 'kalau',
+            '/\bkalo\b/i'    => 'kalau',
+            '/\bsampek\b/i'  => 'sampai',
+            '/\bsampe\b/i'   => 'sampai',
+            '/\bdr\b/i'      => 'dari',
+            '/\bdgn\b/i'     => 'dengan',
+            '/\bbgt\b/i'     => 'sangat',
+            '/\bbnyak\b/i'   => 'banyak',
+            '/\bbyk\b/i'     => 'banyak',
+            '/\bpincg\b/i'   => 'pincang',
+            '/\bbenjol\b/i'  => 'benjolan',
+            '/\bngreweh\b/i' => 'ngiler',
+            '/\bliur\b/i'    => 'air liur',
+            '/\bsrwn\b/i'    => 'sariawan',
+            '/\bpanas\b/i'   => 'demam',
+        ];
+
+        // Terapkan penggantian kata informal
+        foreach ($slangMap as $pattern => $replacement) {
+            $text = preg_replace($pattern, $replacement, $text);
+        }
+
+        // 3. Noise Removal & Cleaning: Menghapus simbol khusus/karakter non-alphanumeric berlebih
+        $text = preg_replace('/[^\w\s\-]/u', ' ', $text);
+
+        // 4. Normalisasi Spasi Ganda
+        $text = preg_replace('/\s+/', ' ', $text);
+
+        return trim($text);
+    }
+
+    /**
+     * ─── EKSTRAKSI ENTITAS KATA KUNCI GEJALA (FEATURE EXTRACTION) ───
+     * Memindai teks deskripsi bebas untuk mengekstrak entitas gejala klinis utama
+     */
+    private function extractSymptomKeywords(string $cleanText): array
+    {
+        if ($cleanText === '') return [];
+
+        $foundKeywords = [];
+
+        // Daftar Pola Kata Kunci Gejala Klinis PMK & LSD
+        $symptomDictionary = [
+            'PMK: Air Liur / Ngiler'     => '/(ngiler|liur|ngreweh|berbusa)/i',
+            'PMK: Sariawan / Lepuh Mulut'=> '/(sariawan|lepuh|luka mulut|lidah|gusi)/i',
+            'PMK: Pincang / Luka Kuku'  => '/(pincang|kuku|kaki luka|sulit berdiri)/i',
+            'LSD: Benjolan / Nodul Kulit' => '/(benjolan|nodul|lato-lato|bintol|bentol)/i',
+            'LSD: Kaki Bengkak Teracak'  => '/(bengkak|teracak|meradang)/i',
+            'LSD: Mata / Hidung Berlendir'=> '/(mata berair|hidung|lendir)/i',
+            'GEJALA: Demam / Panas'      => '/(demam|panas|suhu)/i',
+            'GEJALA: Nafsu Makan Turun'  => '/(tidak makan|kurang makan|lahap|lemas|lesu)/i',
+        ];
+
+        foreach ($symptomDictionary as $label => $pattern) {
+            if (preg_match($pattern, $cleanText)) {
+                $foundKeywords[] = $label;
+            }
+        }
+
+        return $foundKeywords;
+    }
 }
+

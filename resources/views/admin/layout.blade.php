@@ -40,14 +40,13 @@
             <div class="flex justify-between h-16 items-center">
                 <!-- Logo & Brand -->
                 <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-700 to-brand-500 flex items-center justify-center text-white font-bold text-xl shadow-sm">
-                        🐄
-                    </div>
+                    <img src="{{ asset('logo.png') }}" alt="SapiSehat Logo" class="w-10 h-10 object-contain">
                     <div>
                         <span class="text-xl font-bold text-gray-900 tracking-tight">SapiSehat</span>
                         <span class="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-brand-100 text-brand-800 border border-brand-200">Admin Panel</span>
                     </div>
                 </div>
+
 
                 <!-- User Profile & Logout -->
                 <div class="flex items-center space-x-4">

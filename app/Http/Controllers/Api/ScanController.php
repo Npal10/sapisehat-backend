@@ -35,15 +35,18 @@ class ScanController extends Controller
             );
 
             $scan = Scan::create([
-                'cow_id' => $request->cow_id,
+                'cow_id'             => $request->cow_id,
                 'questionnaire_data' => json_encode($request->questionnaire),
-                'description' => $request->description,
-                'fmd_risk' => $analysisResult['fmd_risk'],
-                'lsd_risk' => $analysisResult['lsd_risk'],
-                'confidence_score' => $analysisResult['confidence_score'],
-                'explanation' => $analysisResult['explanation'],
-                'recommendation' => $analysisResult['recommendation'],
+                'description'        => $request->description,
+                'fmd_risk'           => $analysisResult['fmd_risk'],
+                'lsd_risk'           => $analysisResult['lsd_risk'],
+                'pmk_percentage'     => $analysisResult['pmk_percentage'] ?? 0.0,
+                'lsd_percentage'     => $analysisResult['lsd_percentage'] ?? 0.0,
+                'confidence_score'   => $analysisResult['confidence_score'],
+                'explanation'        => $analysisResult['explanation'],
+                'recommendation'     => $analysisResult['recommendation'],
             ]);
+
 
             return response()->json([
                 'success' => true,

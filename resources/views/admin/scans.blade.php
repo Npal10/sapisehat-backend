@@ -110,9 +110,11 @@
                                     <span class="text-xs font-bold text-emerald-600">🟢 Rendah</span>
                                 @endif
                             </td>
-                            <td class="py-4 px-6 font-semibold text-gray-700">
-                                {{ number_format($scan->confidence_score, 1) }}%
+                            <td class="py-4 px-6 font-semibold text-xs whitespace-nowrap">
+                                <div class="text-red-600">PMK: <strong>{{ number_format($scan->pmk_percentage, 1) }}%</strong></div>
+                                <div class="text-orange-600">LSD: <strong>{{ number_format($scan->lsd_percentage, 1) }}%</strong></div>
                             </td>
+
                             <td class="py-4 px-6 text-center">
                                 <a href="{{ route('admin.scans.show', $scan->id) }}" class="inline-flex items-center px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 text-xs font-bold rounded-lg transition">
                                     <i class="ri-eye-line mr-1"></i> Liha Detail

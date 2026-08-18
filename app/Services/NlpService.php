@@ -66,20 +66,19 @@ class NlpService
             "Data Masukan Kuisioner:\n" . $questionnaireText . "\n" .
             "Teks Deskripsi Bebas Peternak (Sudah Dicleaning & Normalisasi):\n\"" . $cleanDescription . "\"\n\n" .
             $extractedText . "\n" .
-            $localComputationText . "\n" .
-
-
-            "TUGAS ANALISIS ANDA:\n" .
-            "- Bandingkan jumlah dan bobot gejala spesifik PMK dan LSD yang bernilai 'IYA' baik dari kuisioner maupun dari teks deskripsi tambahan.\n" .
-            "- Tentukan salah satu penyakit yang paling dominan (jika tidak ada gejala klinis yang mengarah ke PMK atau LSD, tentukan sebagai 'Sehat').\n" .
-            "- Berikan estimasi persentase kemungkinan (confidence score) dari penyakit dominan tersebut (rentang 0-100%).\n" .
+                        "TUGAS ANALISIS ANDA:\n" .
+            "- Hitung persentase probabilitas/risiko penyakit PMK (pmk_percentage) dalam rentang 0.0 - 100.0% berdasarkan gejala klinis PMK yang terdeteksi.\n" .
+            "- Hitung persentase probabilitas/risiko penyakit LSD (lsd_percentage) dalam rentang 0.0 - 100.0% berdasarkan gejala klinis LSD yang terdeteksi.\n" .
+            "- Tentukan salah satu penyakit yang paling dominan (PMK, LSD, atau Sehat jika kedua persentase < 15%).\n" .
             "- Berikan tingkat risiko penyakit dominan tersebut (Rendah, Sedang, atau Tinggi).\n\n" .
             "PENTING: Anda WAJIB mengembalikan balasan HANYA dalam format JSON murni, tanpa teks pembuka/penutup, " .
             "tanpa format markdown (jangan gunakan ```json). Format JSON harus persis seperti berikut:\n" .
             "{\n" .
             "  \"dominant_disease\": \"PMK|LSD|Sehat\",\n" .
+            "  \"pmk_percentage\": 80.0,\n" .
+            "  \"lsd_percentage\": 50.0,\n" .
             "  \"risk_level\": \"Rendah|Sedang|Tinggi\",\n" .
-            "  \"confidence_score\": 85.0,\n" .
+            "  \"confidence_score\": 80.0,\n" .
             "  \"explanation\": \"Penjelasan singkat mengapa penyakit tersebut dominan, merujuk langsung pada gejala spesifik 'IYA' yang dipilih dan teks deskripsi tambahan (maksimal 3 kalimat)\",\n" .
             "  \"recommendation\": \"Rekomendasi tindakan darurat awal bagi peternak untuk menangani penyakit dominan tersebut\"\n" .
             "}";
@@ -107,13 +106,18 @@ class NlpService
                 $decodedJson = json_decode($responseText, true);
 
                 if (json_last_error() === JSON_ERROR_NONE) {
-                    // Petakan JSON agar cocok dengan struktur tabel database
+                    $pmkPct = (float)($decodedJson['pmk_percentage'] ?? 0.0);
+                    $lsdPct = (float)($decodedJson['lsd_percentage'] ?? 0.0);
+                    $confScore = (float)($decodedJson['confidence_score'] ?? max($pmkPct, $lsdPct));
+
                     return [
-                        'fmd_risk' => $decodedJson['dominant_disease'] ?? 'Sehat',
-                        'lsd_risk' => $decodedJson['risk_level'] ?? 'Rendah',
-                        'confidence_score' => (float)($decodedJson['confidence_score'] ?? 0.0),
-                        'explanation' => $decodedJson['explanation'] ?? '',
-                        'recommendation' => $decodedJson['recommendation'] ?? '',
+                        'fmd_risk'         => $decodedJson['dominant_disease'] ?? 'Sehat',
+                        'lsd_risk'         => $decodedJson['risk_level'] ?? 'Rendah',
+                        'pmk_percentage'   => $pmkPct,
+                        'lsd_percentage'   => $lsdPct,
+                        'confidence_score' => $confScore,
+                        'explanation'      => $decodedJson['explanation'] ?? '',
+                        'recommendation'   => $decodedJson['recommendation'] ?? '',
                     ];
                 } else {
                     Log::error('Failed to parse JSON from LLM: ' . json_last_error_msg());
@@ -128,11 +132,11 @@ class NlpService
                 throw new Exception("Terjadi kesalahan saat menghubungi server AI.");
             }
         } catch (Exception $e) {
+        } catch (Exception $e) {
             Log::error('NlpService Exception: ' . $e->getMessage());
             return $this->fallbackAnalysis($questionnaire, $description);
         }
     }
-
 
     private function fallbackAnalysis(array $questionnaire, string $description): array
     {
@@ -172,21 +176,23 @@ class NlpService
         $pmkSymptoms = array_unique($pmkSymptoms);
         $lsdSymptoms = array_unique($lsdSymptoms);
 
+        $pmkPercentage = $pmkScore > 0 ? min(50.0 + ($pmkScore * 5.0), 95.0) : 0.0;
+        $lsdPercentage = $lsdScore > 0 ? min(50.0 + ($lsdScore * 5.0), 95.0) : 0.0;
+
         $dominant = 'Sehat';
         $riskLevel = 'Rendah';
-        $confidence = 0.0;
-        $explanation = '';
-        $recommendation = '';
+        $confidence = max($pmkPercentage, $lsdPercentage);
 
         if ($pmkScore == 0 && $lsdScore == 0) {
             $dominant = 'Sehat';
             $riskLevel = 'Rendah';
             $confidence = 100.0;
+            $pmkPercentage = 0.0;
+            $lsdPercentage = 0.0;
             $explanation = "Sistem Pakar: Tidak ditemukan gejala klinis yang mengarah ke PMK maupun LSD. Sapi dalam kondisi relatif aman.";
             $recommendation = "Tetap jaga kebersihan kandang, berikan pakan bergizi, dan pantau kesehatan sapi secara berkala.";
         } elseif ($pmkScore >= $lsdScore) {
             $dominant = 'PMK';
-            $confidence = min(60.0 + ($pmkScore * 4), 95.0); 
             if ($pmkScore >= 8) {
                 $riskLevel = 'Tinggi';
             } elseif ($pmkScore >= 4) {
@@ -199,7 +205,6 @@ class NlpService
             $recommendation = "Segera karantina sapi dari sapi sehat lainnya. Bersihkan area mulut dan kuku menggunakan antiseptik ringan, serta segera hubungi petugas kesehatan hewan terdekat.";
         } else {
             $dominant = 'LSD';
-            $confidence = min(60.0 + ($lsdScore * 4), 95.0);
             if ($lsdScore >= 8) {
                 $riskLevel = 'Tinggi';
             } elseif ($lsdScore >= 4) {
@@ -213,13 +218,16 @@ class NlpService
         }
 
         return [
-            'fmd_risk' => $dominant,
-            'lsd_risk' => $riskLevel,
-            'confidence_score' => $confidence,
-            'explanation' => $explanation,
-            'recommendation' => $recommendation
+            'fmd_risk'         => $dominant,
+            'lsd_risk'         => $riskLevel,
+            'pmk_percentage'   => round($pmkPercentage, 1),
+            'lsd_percentage'   => round($lsdPercentage, 1),
+            'confidence_score' => round($confidence, 1),
+            'explanation'      => $explanation,
+            'recommendation'   => $recommendation
         ];
     }
+
 
     /**
      * ─── TAHAP PRA-PEMROSESAN TEKS (NLP PREPROCESSING PIPELINE) ───

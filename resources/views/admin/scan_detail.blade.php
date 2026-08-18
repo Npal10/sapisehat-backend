@@ -71,7 +71,7 @@
                     <i class="ri-brain-line text-brand-600 mr-2 text-xl"></i> Hasil Penalaran AI (Google Gemini NLP)
                 </h3>
 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div class="p-4 rounded-xl bg-gray-50 border border-gray-200">
                         <div class="text-xs font-bold text-gray-400 uppercase">Penyakit Dominan</div>
                         <div class="text-lg font-extrabold text-gray-900 mt-1">{{ $scan->fmd_risk }}</div>
@@ -80,11 +80,16 @@
                         <div class="text-xs font-bold text-gray-400 uppercase">Tingkat Risiko</div>
                         <div class="text-lg font-extrabold text-gray-900 mt-1">{{ $scan->lsd_risk }}</div>
                     </div>
-                    <div class="p-4 rounded-xl bg-gray-50 border border-gray-200">
-                        <div class="text-xs font-bold text-gray-400 uppercase">Skor Kepercayaan (Confidence)</div>
-                        <div class="text-lg font-extrabold text-brand-700 mt-1">{{ number_format($scan->confidence_score, 1) }}%</div>
+                    <div class="p-4 rounded-xl bg-red-50/50 border border-red-200">
+                        <div class="text-xs font-bold text-red-600 uppercase">Risiko PMK (%)</div>
+                        <div class="text-lg font-extrabold text-red-700 mt-1">{{ number_format($scan->pmk_percentage, 1) }}%</div>
+                    </div>
+                    <div class="p-4 rounded-xl bg-orange-50/50 border border-orange-200">
+                        <div class="text-xs font-bold text-orange-600 uppercase">Risiko LSD (%)</div>
+                        <div class="text-lg font-extrabold text-orange-700 mt-1">{{ number_format($scan->lsd_percentage, 1) }}%</div>
                     </div>
                 </div>
+
 
                 <!-- Penjelasan Medis AI -->
                 <div class="p-4 rounded-xl bg-blue-50/50 border border-blue-100 space-y-1">
